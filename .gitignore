@@ -1,0 +1,48 @@
+# Visual Studio caches and metadata
+.vs/
+*.db
+*.ipch
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.sln.DotSettings
+
+# Build output directories
+Debug/
+Release/
+x64/
+
+# C++ build artifacts
+*.obj
+*.iobj
+*.ilk
+*.pdb
+*.ipdb
+*.pch
+*.idb
+
+# Build logs and tracking
+*.tlog
+*.log
+*.lastbuildstate
+**/unsuccessfulbuild
+*.recipe
+**/FileListAbsolute.txt
+
+# Local configuration
+.claude/
+imgui.ini
+*.klg
+*.ksc
+
+# Runtime caches
+*.exe.WebView2/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Merge artifacts
+*.orig
+*.rej
