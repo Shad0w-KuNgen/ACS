@@ -350,8 +350,9 @@ void GDIHelper::run()
             std::string::size_type pos = std::string(fullPath).find_last_of("\\/");
             std::string startupPath = std::string(fullPath).substr(0, pos + 1) + executablePath;
 
-            // CreateProcessA �a�r�s�
-            if (!CreateProcessA(NULL, const_cast<LPSTR>(commandLine.c_str()), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+            // CreateProcessA - process'i SUSPENDED baslat ki Themida unpack stub'i calismadan
+            // DLL inject edebilelim. Aksi halde stub anti-injection kontrollerini aktif eder.
+            if (!CreateProcessA(NULL, const_cast<LPSTR>(commandLine.c_str()), NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi))
             {
                 MessageBoxA(mainWindow, "KnightOnLine.exe not found.", "Launcher", MB_ICONINFORMATION);
                 goto return_true;
@@ -366,11 +367,7 @@ void GDIHelper::run()
                 goto return_true;
             }
 
-
-            std::cout << "DLL injected. Waiting for 2 seconds..." << std::endl;
-            Sleep(2000);
-
-            std::cout << "Resuming process..." << std::endl;
+            std::cout << "DLL injected. Resuming process..." << std::endl;
             ResumeThread(pi.hThread);
             CloseHandle(pi.hThread);
             CloseHandle(pi.hProcess);

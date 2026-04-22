@@ -1,0 +1,66 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build REVOLTEACS.dll (Release|Win32)",
+            "type": "shell",
+            "command": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\REVOLTEACS.sln",
+                "/t:Build",
+                "/p:Configuration=Release",
+                "/p:Platform=Win32",
+                "/m",
+                "/nologo",
+                "/v:minimal"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
+            "label": "Build REVOLTELAUNCHER (Release|Win32)",
+            "type": "shell",
+            "command": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\REVOLTELAUNCHER\\Launcher.vcxproj",
+                "/t:Build",
+                "/p:Configuration=Release",
+                "/p:Platform=Win32",
+                "/m",
+                "/nologo",
+                "/v:minimal"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
+            "label": "Build REVOLTELAUNCHER (Debug|Win32)",
+            "type": "shell",
+            "command": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\MSBuild.exe",
+            "args": [
+                "${workspaceFolder}\\REVOLTELAUNCHER\\Launcher.sln",
+                "/t:Build",
+                "/p:Configuration=Debug",
+                "/p:Platform=Win32",
+                "/m",
+                "/nologo",
+                "/v:minimal"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
+            "label": "Build ALL (DLL + Launcher Release)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Build REVOLTEACS.dll (Release|Win32)",
+                "Build REVOLTELAUNCHER (Release|Win32)"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

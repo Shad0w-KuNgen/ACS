@@ -483,6 +483,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+        // DEBUG: attach için 10sn pencere — VS Code "Attach to KnightOnLine.exe" ile bağlan
+        Sleep(10000);
         REVOLTEACSLoad();
         break;
     }

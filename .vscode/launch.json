@@ -1,0 +1,55 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch REVOLTELAUNCHER (Release|Win32)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "preLaunchTask": "Build REVOLTELAUNCHER (Release|Win32)",
+            "program": "${workspaceFolder}\\REVOLTELAUNCHER\\Win32\\Release\\Launcher.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}\\Release",
+            "environment": [],
+            "console": "internalConsole",
+            "symbolSearchPath": "${workspaceFolder}\\REVOLTELAUNCHER\\Win32\\Release;${workspaceFolder}\\Release"
+        },
+        {
+            "name": "Launch REVOLTELAUNCHER (Debug|Win32)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\REVOLTELAUNCHER\\Debug\\Launcher.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}\\Release",
+            "environment": [],
+            "console": "internalConsole",
+            "symbolSearchPath": "${workspaceFolder}\\REVOLTELAUNCHER\\Debug;${workspaceFolder}\\Release"
+        },
+        {
+            "name": "Launch prebuilt Release\\Launcher.exe",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\Release\\Launcher.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}\\Release",
+            "environment": [],
+            "console": "internalConsole"
+        },
+        {
+            "name": "Attach to KnightOnLine.exe (REVOLTEACS DLL debug)",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+            "symbolSearchPath": "${workspaceFolder}\\Release;${workspaceFolder}\\REVOLTEACS\\Debug;${workspaceFolder}\\Win32\\Release"
+        },
+        {
+            "name": "Attach to Launcher.exe",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+            "symbolSearchPath": "${workspaceFolder}\\REVOLTELAUNCHER\\Win32\\Release;${workspaceFolder}\\REVOLTELAUNCHER\\Debug;${workspaceFolder}\\Release"
+        }
+    ]
+}
