@@ -5,7 +5,7 @@
             "name": "Launch REVOLTELAUNCHER (Release|Win32)",
             "type": "cppvsdbg",
             "request": "launch",
-            "preLaunchTask": "Build REVOLTELAUNCHER (Release|Win32)",
+            "preLaunchTask": "Build ALL (DLL + Launcher Release)",
             "program": "${workspaceFolder}\\REVOLTELAUNCHER\\Win32\\Release\\Launcher.exe",
             "args": [],
             "stopAtEntry": false,

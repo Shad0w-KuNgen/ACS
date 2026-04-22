@@ -102,6 +102,22 @@ bool InjectDLL(DWORD pid, const char* dllPath)
 
     WaitForSingleObject(hThread, INFINITE);
 
+    // LoadLibraryA'nin gercekten calisip calismadini dogrula.
+    // Thread exit code = LoadLibraryA'nin return degeri (HMODULE).
+    // NULL ise yukleme basarisiz (eksik dependency veya DllMain FALSE dondu).
+    DWORD loadResult = 0;
+    GetExitCodeThread(hThread, &loadResult);
+    if (loadResult == 0)
+    {
+        char errMsg[256];
+        sprintf_s(errMsg, "LoadLibraryA failed in remote process.\nDLL: %s\n\nOlasi neden:\n- Eksik dependency (d3d9.dll, detours.lib)\n- DLL x86/x64 uyumsuzlugu\n- DllMain exception", dllPath);
+        MessageBoxA(NULL, errMsg, "InjectDLL", MB_ICONERROR);
+        VirtualAllocEx(hProcess, pRemoteBuf, 0, MEM_RELEASE, PAGE_READWRITE);
+        CloseHandle(hThread);
+        CloseHandle(hProcess);
+        return false;
+    }
+
     VirtualAllocEx(hProcess, pRemoteBuf, 0, MEM_RELEASE, PAGE_READWRITE);
     CloseHandle(hThread);
     CloseHandle(hProcess);
@@ -334,8 +350,19 @@ void GDIHelper::run()
             CloseHandle(clientProcessInfo.hProcess);
 #endif
 #if 1
-            std::string currentDir = GetCurrentDirectory();
-            std::string dllPath = currentDir + "\\REVOLTEACS.dll";
+            // dllPath: her zaman Launcher.exe'nin yanindaki REVOLTEACS.dll
+            char launcherDir[MAX_PATH];
+            GetModuleFileNameA(NULL, launcherDir, MAX_PATH);
+            std::string::size_type lastSlash = std::string(launcherDir).find_last_of("\\/");
+            std::string dllPath = std::string(launcherDir).substr(0, lastSlash + 1) + "REVOLTEACS.dll";
+
+            // DEBUG: DLL path ve varlik kontrolu — build sonrasi kaldir
+            {
+                BOOL exists = GetFileAttributesA(dllPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+                char dbg[512];
+                sprintf_s(dbg, "DLL: %s\nExists: %s", dllPath.c_str(), exists ? "YES" : "NO <-- SORUN");
+                MessageBoxA(NULL, dbg, "DEBUG", MB_ICONINFORMATION);
+            }
 
             STARTUPINFO si = { sizeof(si) };
             PROCESS_INFORMATION pi;

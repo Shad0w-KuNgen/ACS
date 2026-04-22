@@ -30,6 +30,47 @@ inline static DWORD Read4Byte(HANDLE hProcess, DWORD dwAddress)
     return nValue;
 }
 
+// ============================================================================
+// REVLOG — Diagnostic file + DebugString logger
+// ----------------------------------------------------------------------------
+// Crash oncesi son yazılan satir = oyunun oldugu nokta.
+// File:  C:\REVOLTEACS.log  (her yazımdan sonra fflush + fclose)
+// Debug: OutputDebugStringA (Sysinternals DebugView ile canli izlenir)
+// ============================================================================
+static CRITICAL_SECTION g_LogCs;
+static BOOL g_LogInit = FALSE;
+
+static void RevLog(const char* fmt, ...)
+{
+    if (!g_LogInit) {
+        InitializeCriticalSection(&g_LogCs);
+        g_LogInit = TRUE;
+    }
+    EnterCriticalSection(&g_LogCs);
+
+    char msg[1024];
+    SYSTEMTIME st; GetLocalTime(&st);
+    int hdr = sprintf_s(msg, sizeof(msg),
+        "[%02d:%02d:%02d.%03d T=%05lu] ",
+        st.wHour, st.wMinute, st.wSecond, st.wMilliseconds,
+        GetCurrentThreadId());
+
+    va_list ap; va_start(ap, fmt);
+    vsnprintf(msg + hdr, sizeof(msg) - hdr - 2, fmt, ap);
+    va_end(ap);
+    strcat_s(msg, sizeof(msg), "\n");
+
+    FILE* fp = nullptr;
+    if (fopen_s(&fp, "C:\\REVOLTEACS.log", "a") == 0 && fp) {
+        fputs(msg, fp);
+        fflush(fp);
+        fclose(fp);
+    }
+    OutputDebugStringA(msg);
+
+    LeaveCriticalSection(&g_LogCs);
+}
+
 // Bu fonksiyon, thread'in i�inde �al��acak olan fonksiyon.
 // Bu fonksiyon, thread'in i�inde �al��acak olan fonksiyon.
 DWORD WINAPI RandomYazdir(LPVOID lpParam) {
@@ -52,77 +93,117 @@ DWORD WINAPI RandomYazdir(LPVOID lpParam) {
 	return 0;
 }
 
+// ============================================================================
+// YENI CLIENT (v25XX) XIGNCODE DISPATCHER BYPASS
+// ----------------------------------------------------------------------------
+// dword_F661D0 @ 0x00F661D0 = XIGNCODE SDK function pointer slot'u.
+// Yeni client'ta 21 yerden call ediliyor (dispatcher pattern).
+// SDK init bu slot'a gercek check fn adresini yaziyor; biz NopHandler'i
+// yazip tum call'larin "xor eax, eax; ret 4" stub'ina gelmesini sagliyoruz.
+// Calling convention ipucu: __stdcall 1 arg (0x0050BAA9 call site'i).
+// ============================================================================
+
+// NopHandler stub: xor eax, eax; ret 4 => gercek fn'i taklit, basari donder
+static unsigned char g_NopHandler[] = {
+	0x33, 0xC0,        // xor eax, eax    (return 0 = success)
+	0xC2, 0x04, 0x00   // ret 4            (__stdcall 1 arg cleanup)
+};
+
+// Watchdog: XIGNCODE SDK dword_F661D0'a yazdiktan sonra uzerine yazar
+DWORD WINAPI XignDispatcherWatchdog(LPVOID /*lpParam*/)
+{
+	const DWORD XIGN_SLOT = 0x00F661D0;
+	RevLog("watchdog: started, stub=%p", (void*)g_NopHandler);
+	DWORD tickCount = 0;
+	void* lastSeen = nullptr;
+	while (true)
+	{
+		__try
+		{
+			void** slot = (void**)XIGN_SLOT;
+			void* cur = *slot;
+			if (cur != lastSeen) {
+				RevLog("watchdog: slot value changed: %p -> %p", lastSeen, cur);
+				lastSeen = cur;
+			}
+			if (cur != (void*)g_NopHandler) {
+				*slot = (void*)g_NopHandler;
+				RevLog("watchdog: overrode slot with stub (was %p)", cur);
+			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER) {
+			if ((tickCount % 50) == 0)
+				RevLog("watchdog: slot read exception (code=%08lx)", GetExceptionCode());
+		}
+		if ((++tickCount % 100) == 0)   // ~10sn'de bir heartbeat
+			RevLog("watchdog: alive, tick=%lu", tickCount);
+		Sleep(100);
+	}
+	return 0;
+}
+
 
 void REVOLTEACSRemapProcess(HANDLE hProcess)
 {
+	RevLog("remap: begin, pid=%lu, hProcess=%p", GetCurrentProcessId(), hProcess);
 	if (GetAddress(skCryptDec("KO_PATCH_ADDRESS1")) > 0)
 	{
+		RevLog("remap: section 1 @ %08lX size=%lu",
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS1")),
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS1_SIZE")));
 		Remap::PatchSection(
 			hProcess,
 			(LPVOID*)GetAddress(skCryptDec("KO_PATCH_ADDRESS1")),
 			GetAddress(skCryptDec("KO_PATCH_ADDRESS1_SIZE")), PAGE_EXECUTE_READWRITE);
+		RevLog("remap: section 1 done");
 	}
 
 	if (GetAddress(skCryptDec("KO_PATCH_ADDRESS2")) > 0)
 	{
+		RevLog("remap: section 2 @ %08lX size=%lu",
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS2")),
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS2_SIZE")));
 		Remap::PatchSection(
 			hProcess,
 			(LPVOID*)GetAddress(skCryptDec("KO_PATCH_ADDRESS2")),
 			GetAddress(skCryptDec("KO_PATCH_ADDRESS2_SIZE")), PAGE_EXECUTE_READWRITE);
+		RevLog("remap: section 2 done");
 	}
 
 	if (GetAddress(skCryptDec("KO_PATCH_ADDRESS3")) > 0)
 	{
+		RevLog("remap: section 3 @ %08lX size=%lu",
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS3")),
+			GetAddress(skCryptDec("KO_PATCH_ADDRESS3_SIZE")));
 		Remap::PatchSection(
 			hProcess,
 			(LPVOID*)GetAddress(skCryptDec("KO_PATCH_ADDRESS3")),
 			GetAddress(skCryptDec("KO_PATCH_ADDRESS3_SIZE")), PAGE_EXECUTE_READWRITE);
+		RevLog("remap: section 3 done");
 	}
 
-	/*XINGCODE*/
+	// TODO: Asagidaki patch'ler v2524'e ozgu adresler — yeni client icin
+	// dogru adresler bulunana kadar devre disi. Yanlis adrese yazilinca
+	// Themida unpack sirasinda crash olur.
 
-	BYTE byPatch[] = { 0xE9, 0x7A, 0x06, 0x00, 0x00, 0x90, 0x90 };
-	WriteProcessMemory(hProcess, (LPVOID*)0x00E73CD7, &byPatch, sizeof(byPatch), 0);
+	// TODO v2524 XINGCODE patch — yeni client'ta adres kaydi, NopHandler watchdog kullaniyoruz
+	// BYTE byPatch[] = { 0xE9, 0x7A, 0x06, 0x00, 0x00, 0x90, 0x90 };
+	// WriteProcessMemory(hProcess, (LPVOID*)0x00E73CD7, &byPatch, sizeof(byPatch), 0);
 
-	/*00FC7644 | 4B | dec ebx |*/
-	char buff[50];
-	sprintf_s(buff, ("REVOLTEACS[%d]"), GetCurrentProcessId());
-	WriteProcessMemory(hProcess, (LPVOID*)0x00FCB66C, &buff, sizeof(buff), 0);
+	// TODO v2524 process ID obfuscation — yeni client adres bilinmiyor
+	// char buff[50];
+	// sprintf_s(buff, ("REVOLTEACS[%d]"), GetCurrentProcessId());
+	// WriteProcessMemory(hProcess, (LPVOID*)0x00FCB66C, &buff, sizeof(buff), 0);
 
-	// Adresler.
-	DWORD adresler[] = { 0x01161AF4, 0x01161A5C, 0x01161648, 0x11619D4, 0x11619CC, 0x011619DC, 0x011619D8 };
+	// TODO v2524 RandomYazdir anti-cheat obfuscation — adresler yeni client'ta farkli
+	// DWORD adresler[] = { 0x01161AF4, 0x01161A5C, ... };
+	RevLog("remap: v2524 patches skipped (address shift)");
 
-	// Her adres i�in bir thread olu�tur.
-	for (int i = 0; i < sizeof(adresler) / sizeof(adresler[0]); ++i)
-	{
-		HANDLE hThread = CreateThread(NULL, 0, RandomYazdir, (LPVOID)adresler[i], 0, NULL);
-		if (hThread == NULL)
-		{
-			return;
-		}
-		CloseHandle(hThread);
-	}
-
-
-
-	*(uint8_t*)0x006FCC93 = 0xEB;
-	*(uint8_t*)0x0079FB0F = 0xEB;
-
-	/*XIGNCODE*/
-	*(uint8_t*)0x004F35DF = 0x25;
-	*(uint8_t*)0x004F35F9 = 0x0B;
-
-	*(uint8_t*)0x0079E44A = 0x29;
-	*(uint8_t*)0x0079E464 = 0x0F;
-
-	*(uint8_t*)0x0079DE63 = 0xC9;
-	*(uint8_t*)0x0079DE81 = 0xAB;
-
-	*(uint8_t*)0x006FDC92 = 0x2C;
-	*(uint8_t*)0x006FDCAC = 0x12;
-
-	*(uint8_t*)0x00795AA7 = 0x25;
-	*(uint8_t*)0x00795AC1 = 0x0B;
+	RevLog("remap: starting watchdog thread");
+	HANDLE hWatchdog = CreateThread(NULL, 0, XignDispatcherWatchdog, NULL, 0, NULL);
+	if (hWatchdog != NULL)
+		CloseHandle(hWatchdog);
+	RevLog("remap: all done");
 }
 
 
@@ -418,28 +499,17 @@ DWORD WINAPI OffsetVerifyThread(LPVOID lpParam)
 
 void REVOLTEACSHook(HANDLE hProcess)
 {
-	// --- Game Hooks (EndGame, Tick, Login Intro, patches) ---
-	g_GameHooks.InitAllHooks(hProcess);
+	RevLog("hook: begin (hooklar devre disi - adres kaymasina karsi)");
 
-	// --- UI Hook (UIManager) ---
-	g_UIManager.Init();
+	// TODO: Yeni client adresler dogrulaninca tek tek ac
+	// g_GameHooks.InitAllHooks(hProcess);   // EndGame 0x00E76BD9, Tick 0x006CE830
+	// g_UIManager.Init();
+	// g_PacketHandler.InitSendHook();       // 0x006FC190
+	// g_PacketHandler.InitRecvHook();       // 0x0082C7D0
+	// CreateThread RenderSystem
+	// Engine = new PearlEngine(); Engine->Init();
 
-	// --- Packet Send/Recv Hook (PacketHandler) ---
-	g_PacketHandler.InitSendHook();
-	g_PacketHandler.InitRecvHook();
-
-
-	// --- RenderSystem — DX9 EndScene hook (ayri thread'de) ---
-	CreateThread(NULL, 0, [](LPVOID) -> DWORD {
-		Sleep(3000); // Oyun DX9 device'i olustursun diye 3sn bekle
-		g_RenderSystem.Init();
-		return 0;
-	}, NULL, 0, NULL);
-
-	// --- PearlEngine — merkezi engine baslatma ---
-	Engine = new PearlEngine();
-	Engine->Init();
-
+	RevLog("hook: all done (no-op)");
 }
 void ExitSystem()
 {
@@ -452,17 +522,23 @@ void REVOLTEACSRemap()
 {
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, GetCurrentProcessId());
     if (hProcess == NULL) {
-        MessageBoxA(NULL, "REVOLTEACS Image Map ReadWrite Error\n", "REVOLTEACS Security System", 0);
-        ExitSystem();
+        RevLog("remap: OpenProcess failed");
+        return;
     }
-    RemapArrayInsert("KO_PATCH_ADDRESS1", 0x00400000);
-    RemapArrayInsert("KO_PATCH_ADDRESS1_SIZE", 0x00B30000);
-    RemapArrayInsert("KO_PATCH_ADDRESS2", 0x00F30000);
-    RemapArrayInsert("KO_PATCH_ADDRESS2_SIZE", 0x00130000);
-    RemapArrayInsert("KO_PATCH_ADDRESS3", 0x01060000);
-    RemapArrayInsert("KO_PATCH_ADDRESS3_SIZE", 0x00010000);
-	REVOLTEACSRemapProcess(hProcess);
+
+    // TEST: Section remap devre disi — Themida RWX detect edip process'i olduruyorsa
+    // bu blok olmadan client acilmali. Acilirsa sorun remap'te.
+    // RemapArrayInsert("KO_PATCH_ADDRESS1", 0x00400000);
+    // RemapArrayInsert("KO_PATCH_ADDRESS1_SIZE", 0x00B30000);
+    // RemapArrayInsert("KO_PATCH_ADDRESS2", 0x00F30000);
+    // RemapArrayInsert("KO_PATCH_ADDRESS2_SIZE", 0x00130000);
+    // RemapArrayInsert("KO_PATCH_ADDRESS3", 0x01060000);
+    // RemapArrayInsert("KO_PATCH_ADDRESS3_SIZE", 0x00010000);
+    // REVOLTEACSRemapProcess(hProcess);
+
+	RevLog("remap: section remap skipped (test mode)");
 	REVOLTEACSHook(hProcess);
+	CloseHandle(hProcess);
 }
 
 void REVOLTEACSLoad()
@@ -483,8 +559,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-        // DEBUG: attach için 10sn pencere — VS Code "Attach to KnightOnLine.exe" ile bağlan
-        Sleep(10000);
         REVOLTEACSLoad();
         break;
     }
