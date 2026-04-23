@@ -356,13 +356,13 @@ void GDIHelper::run()
             std::string::size_type lastSlash = std::string(launcherDir).find_last_of("\\/");
             std::string dllPath = std::string(launcherDir).substr(0, lastSlash + 1) + "REVOLTEACS.dll";
 
-            // DEBUG: DLL path ve varlik kontrolu — build sonrasi kaldir
-            {
-                BOOL exists = GetFileAttributesA(dllPath.c_str()) != INVALID_FILE_ATTRIBUTES;
-                char dbg[512];
-                sprintf_s(dbg, "DLL: %s\nExists: %s", dllPath.c_str(), exists ? "YES" : "NO <-- SORUN");
-                MessageBoxA(NULL, dbg, "DEBUG", MB_ICONINFORMATION);
-            }
+            // DEBUG: DLL path ve varlik kontrolu
+            // {
+            //     BOOL exists = GetFileAttributesA(dllPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+            //     char dbg[512];
+            //     sprintf_s(dbg, "DLL: %s\nExists: %s", dllPath.c_str(), exists ? "YES" : "NO <-- SORUN");
+            //     MessageBoxA(NULL, dbg, "DEBUG", MB_ICONINFORMATION);
+            // }
 
             STARTUPINFO si = { sizeof(si) };
             PROCESS_INFORMATION pi;
